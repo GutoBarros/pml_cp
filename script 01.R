@@ -40,3 +40,5 @@ corrplot(cor(traindata1[,7:58]),
          cex.var = 0.2)
 
 
+
+
