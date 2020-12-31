@@ -40,5 +40,50 @@ corrplot(cor(traindata1[,7:58]),
          cex.var = 0.2)
 
 
+## Create data partition
 
+set.seed(1969)
+indice <- createDataPartition(y= traindata1$classe, p = .70, list=FALSE)
+training <- traindata1[indice,]
+testing <- traindata1[-indice,]
 
+preProc <- preProcess(training[, -c(1:9)], method = "pca", thresh = .9)
+
+training <- predict(preProc, training)
+
+ml_xgboost <- train(classe ~ .,
+                    method = "xgbTree",
+                    data = training)
+
+train_pred <- predict(ml_xgboost, training[,-4])
+confusionMatrix(train_pred, as.factor(training$classe))
+
+varImp(ml_xgboost)
+
+## teste
+
+testing <- predict(preProc, testing)
+
+test_pred <- predict(ml_xgboost, testing[,-4])
+confusionMatrix(test_pred, as.factor(testing$classe))
+
+# Load test data
+
+theURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+if(file_test("-f", "pml-testing.csv") == FALSE) 
+{
+  download.file(theURL,"pml-testing.csv",mode = "wb")
+}
+
+testdata <- read.csv("pml-testing.csv", na.strings = c("","NA","NULL"))
+
+names.use <- names(testdata)[(names(testdata) %in% dataquality$skim_variable)]
+
+testdata1 <- testdata[ , names.use]
+
+testdata1$cvtd_timestamp <- dmy_hm(testdata1$cvtd_timestamp)
+
+testdata1 <- testdata1[,-c(1,3)]
+
+testdata1 <- predict(preProc, testdata)
