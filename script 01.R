@@ -87,3 +87,38 @@ testdata1$cvtd_timestamp <- dmy_hm(testdata1$cvtd_timestamp)
 testdata1 <- testdata1[,-c(1,3)]
 
 testdata1 <- predict(preProc, testdata)
+
+### Usando apenas as features dos sensores (excluindo metadados)
+
+traindata2 <- traindata1[, -c(1:3,5:6)]
+
+set.seed(1969)
+indice <- createDataPartition(y= traindata1$classe, p = .70, list=FALSE)
+training <- traindata2[indice,]
+testing <- traindata2[-indice,]
+
+preProc <- preProcess(training[, -1], method = "pca", thresh = .9)
+
+fitControl <- trainControl (method = "repeatedcv",
+                            number = 10,
+                            repeats = 10)
+
+training <- predict(preProc, training)
+
+ml_xgboost1 <- train(classe ~ .,
+                    method = "xgbTree",
+                    trControl = fitControl,
+                    data = training)
+
+train_pred <- predict(ml_xgboost1, training[,-1])
+confusionMatrix(train_pred, as.factor(training$classe))
+
+varImp(ml_xgboost1)
+
+testing <- predict(preProc, testing)
+
+saveRDS(ml_xgboost1, "ml_xgboost1.RDS")
+test_pred <- predict(ml_xgboost1, testing[,-1])
+t <- confusionMatrix(test_pred, as.factor(testing$classe))
+t <- t[[2]]
+t <- as.data.frame(t)
