@@ -122,9 +122,32 @@ The use of Principal Component Analysis (PCA) to reduce dimensionality seems to 
 ```{r}
 preProc <- preProcess(training[, -1], method = "pca", thresh = .9)
 preProc
+
+training <- predict(preProc, training)
 ```
 
 
+## Modeling
+
+A XGBoost model was trained by using the Caret package. Cross Validation with k = 10 was used to tuning the model's parameters.
+
+```{r, cache= TRUE}
+fitControl <- trainControl (method = "repeatedcv",
+                            number = 10,
+                            repeats = 10)
+
+if(file_test("-f", "ml_xgboost.RDS") == FALSE) 
+  {
+  ml_xgboost <- train(classe ~ .,
+                    method = "xgbTree",
+                    trControl = fitControl,
+                    data = training)
+  saveRDS(ml_xgboost, "ml_xgboost.RDS")
+}
+ml_xgboost <- readRDS("ml_xgboost.RDS")
+ml_xgboost
+
+```
 
 
 
