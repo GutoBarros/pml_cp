@@ -16,6 +16,16 @@ if(file_test("-f", "pml-training.csv") == FALSE)
 
 traindata <- read.csv("pml-training.csv", na.strings = c("","NA","NULL"))
 
+# Inspecting missiness by row
+
+traindata$miss <- 0
+for (i in 1:nrow(traindata)){
+  traindata[i,161] <- sum(is.na(traindata[i,]))
+}
+summary(traindata$miss)
+table(traindata$miss, traindata$classe)
+
+
 # Data recognition & primary adjusts
 dataquality <- skim_without_charts(traindata)
 dataquality <- subset(dataquality, complete_rate > 0.05)
