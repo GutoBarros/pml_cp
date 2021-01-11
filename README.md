@@ -1,2 +1,3 @@
-# pml_cp
-Course Project for Pratical Machine learning @Coursera
+title: "Practical Machine Learning Course Project"
+author: "Jose Augusto Barros de Oliveira"
+date: "02/01/2021"
