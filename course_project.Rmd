@@ -2,7 +2,12 @@
 title: "Practical Machine Learning Course Project"
 author: "Jose Augusto Barros de Oliveira"
 date: "02/01/2021"
-output: rmdformats::readthedown
+output:
+    html_document:
+     theme: cosmo
+     highlight: tango
+     toc: true
+     toc_float: true
 ---
 
 ```{r setup, include=FALSE}

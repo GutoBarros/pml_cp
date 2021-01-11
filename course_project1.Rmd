@@ -54,7 +54,7 @@ It seems that we have two classes of features, regarding their origin. The major
 
 We found a perfect correlation between *raw_timestamp_part_1* and *cvtd_timestamp*, meaning that they express the same thing, so we can get rid of one of them
 
-```{r}
+```{r plot1}
 
 g1 <- ggplot(data=training, aes(x=as.numeric(raw_timestamp_part_1), y = dmy_hm(cvtd_timestamp))) +
   geom_point(shape =1, position=position_jitter(width=2,height=2)) +
@@ -66,7 +66,7 @@ g1
 
 We found an almost deterministic relationship between *num_window* and *classe*, suggesting that the experimental design carried out series of repeated measures by *classe* and subject, as showed in the next plot.
 
-```{r}
+```{r plot2}
 temp <- training %>%
   count(classe, num_window,user_name)
 
@@ -77,16 +77,20 @@ rm(temp)
 g2
 ```
 
-Thus, *num_window* by itself is enough to predict *classe* with (almost) zero error on trainining data and a really impressive accuracy on testing data:
+Thus, *num_window* by itself is enough to predict *classe* with zero error on training data and a really impressive accuracy on testing data:
 
-```{r}
+```{r random_forest_to_num_window}
 if(file_test("-f", "ml_rf.RDS") == FALSE) 
   {
   ml_rf <- train(classe ~ num_window + user_name, method = "rf", data = training)
   saveRDS(ml_rf, "ml_rf.RDS")
 }
 ml_rf <- readRDS("ml_rf.RDS")
-ml_rf$finalModel
+
+# in sample performance
+confusionMatrix(predict(ml_rf, newdata = training[,-160]), reference = as.factor(training[,160]))
+
+#outsample performance
 confusionMatrix(predict(ml_rf, newdata = testing[,-160]), reference = as.factor(testing[,160]))
 ```
 
@@ -94,24 +98,24 @@ confusionMatrix(predict(ml_rf, newdata = testing[,-160]), reference = as.factor(
 
 ### Measurement features
 
-Although the instructions for this project grants the use of any feature available on the training dataset, we decide to stick with the principles of the original paper and kept only the measurement variables, as the original main goal was to use the measures of movement as predictors, not the metadata.
+Although the instructions for this project grants the use of any feature available on the training dataset, we decide to stick with the principles of the original paper and kept only the measurement variables, as the original main goal was to use the measures of movement as predictors, not the metadata. So, we decided to drop the metadata features and go on with the measurement ones.
 
-```{r}
+```{r assessing_completness_of_measurement _features}
 # Data assessment
-dataquality <- skim_without_charts(training)
+dataquality <- skim_without_charts(training[,-c(1:7)])
 head(dataquality,10)
 ```
 
-There are `r nrow(subset(dataquality, complete_rate < 0.05)) `  features with complete rate equals to 0.02. This missingness is probably Missing at Random (MAR), since there is a pattern, being the amount of missing values the same across the features and cases. We choose to drop those features because we couldn't figure out a better approach.
+There are `r nrow(subset(dataquality, complete_rate < 0.022)) `  features with complete rate near to 0.02. This missingness is probably Missing at Random (MAR), since there is a pattern, being the amount of missing values the same across the features and cases. We choose to drop those features because it's hard to make a good inference on their values based on so scarce data and we were afraid to introduce bias. 
 
-```{r}
+```{r feature selection}
 
-temp <- subset(dataquality, complete_rate > 0.05)
+temp <- subset(dataquality, complete_rate > 0.022)
 training <- training[, temp$skim_variable]
 rm(temp)
-training <- training[,-c(1:3,5:8)] # Drop metadata variables
 
-head(skim_without_charts(training),10)
+# final dataset to modeling
+colnames(training)
 
 ```
 
@@ -119,7 +123,7 @@ head(skim_without_charts(training),10)
 
 Some variables are high correlated:
 
-```{r}
+```{r correlations}
 corrplot(cor(training[,-1]),
          method = "square",
          type = "upper", diag = FALSE,
@@ -127,9 +131,9 @@ corrplot(cor(training[,-1]),
 
 ```
 
-The use of Principal Component Analysis (PCA) to reduce dimensionality seems to be a good approach in this case. We kept 90% of the original variance, ending with 20 components. It is notewothy that centering and scaling the variables are carried out along with the PCA pre process.
+We try of Principal Component Analysis (PCA) to reduce dimensionality seems to be a good approach in this case. We kept 90% of the original variance, ending with 20 components. It is notewothy that centering and scaling the variables are carried out along with the PCA pre process.
 
-```{r}
+```{r preprocessing}
 preProc <- preProcess(training[, -1], method = "pca", thresh = .9)
 preProc
 
@@ -139,25 +143,86 @@ training <- predict(preProc, training)
 
 ## Modeling
 
-A XGBoost model was trained by using the Caret package. Cross Validation with k = 10 was used to tuning the model's parameters.
+A XGBoost model was trained on the data processed with PCA by using the Caret package. We used the method "xgbtree" that needs seven parameters:  
 
-```{r, cache= TRUE}
+* nrounds (# Boosting Iterations)
+* max_depth (Max Tree Depth)
+* eta (Shrinkage)
+* gamma (Minimum Loss Reduction)
+* colsample_bytree (Subsample Ratio of Columns)
+* min_child_weight (Minimum Sum of Instance Weight)
+* subsample (Subsample Percentage)
+
+The grid search for those parameters comprised 243 models (see [The Caret Reference, Basic parameter Tuning](https://topepo.github.io/caret/model-training-and-tuning.html#basic-parameter-tuning)), each of then was cross validated in ten folds (k = 10). The final parameters were:
+
+```{r xgboost_model}
 fitControl <- trainControl (method = "repeatedcv",
                             number = 10,
                             repeats = 10)
 
-if(file_test("-f", "ml_xgboost.RDS") == FALSE) 
+if(file_test("-f", "ml_xgboost1.RDS") == FALSE) 
   {
-  ml_xgboost <- train(classe ~ .,
+  ml_xgboost1 <- train(classe ~ .,
                     method = "xgbTree",
                     trControl = fitControl,
                     data = training)
-  saveRDS(ml_xgboost, "ml_xgboost.RDS")
+  saveRDS(ml_xgboost1, "ml_xgboost1.RDS")
 }
-ml_xgboost <- readRDS("ml_xgboost.RDS")
-ml_xgboost
+ml_xgboost1 <- readRDS("ml_xgboost1.RDS")
+ml_xgboost1$finalModel
 
 ```
+
+### Model's performance
+
+The in sample performance was
+```{r in_sample_perfomance}
+confusionMatrix(predict(ml_xgboost1, newdata = training[,-1]), reference = as.factor(training[,1]))
+
+```
+
+The out of sample performance was
+
+```{r out_sample_perfomance}
+temp <- subset(dataquality, complete_rate > 0.022)
+testing <- testing[, temp$skim_variable]
+rm(temp)
+
+testing <- predict(preProc, testing) # preprocessing (PCA) testdata using preprocess from training data
+
+confusionMatrix(predict(ml_xgboost1, newdata = testing[,-1]), reference = as.factor(testing[,1]))
+
+```
+
+
+
+
+
+## Prediction and final assessment
+
+```{r}
+# Load test data
+
+theURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+if(file_test("-f", "pml-testing.csv") == FALSE) 
+{
+  download.file(theURL,"pml-testing.csv",mode = "wb")
+}
+
+testdata <- read.csv("pml-testing.csv", na.strings = c("","NA","NULL"))
+
+names.use <- names(testdata)[(names(testdata) %in% dataquality$skim_variable)]
+
+testdata <- testdata[ , names.use]
+
+temp <- subset(dataquality, complete_rate > 0.022)
+temp <- temp[-1,] # drop the target
+testing <- testdata[, temp$skim_variable]
+rm(temp)
+
+```
+
 
 
 
