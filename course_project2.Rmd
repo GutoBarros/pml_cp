@@ -20,10 +20,10 @@ library(tidyverse)
 
 The goal of this project is predict whether weight-lift exercises were performed as recommended. It uses the experimental design and data from [Qualitative Activity Recognition of Weight Lifting Exercises](http://groupware.les.inf.puc-rio.br/har). (Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human ’13) . Stuttgart, Germany: ACM SIGCHI, 2013).  
 
-The dataset contains 160 features and 19622 cases. The data was splited in two sets, the training one with 70% of cases. After some Exploratory Data Analysis (EDA), we decide to go forward modeling with 60 features, besides the target. We performed Principal Component Analysis (PCA) in order to reduce the dimensionality, ending with 20 components that explained 90% of the variance, but we gave up, looking at the trade-off between dimensionality, interpretability and acuracy.
+The dataset contains 160 features and 19622 cases. The data was splited in two sets, the training one with 70% of cases. After some Exploratory Data Analysis (EDA), we decide to go forward modeling with 60 features, besides the target. We performed Principal Component Analysis (PCA) in order to reduce the dimensionality, (20 components explained 90% of the variance), but we gave up that approach, looking at the trade-off between dimensionality, interpretability and acuracy.
 
 We chose a XGBoost model and used cross validation (CV) with K = 10 to tuning parameters.
-The overall model accuracy on test set (out sample) was 99,73%. The main features in the model were *row_belt*, *yaw_belt*, *magnet_dumbell_z* and *pitch_forearm* (50% variable importance).
+The overall model accuracy on test set (out sample) was 99.7%, a significant improvement over the original study performance (98.2%) . The main features in the model were *row_belt*, *yaw_belt*, *magnet_dumbell_z* and *pitch_forearm* (50% of total variable importance).
 
 
 ## Data wrangling and first analysis
@@ -107,7 +107,7 @@ dataquality <- skim_without_charts(training[,-c(1:7)])
 head(dataquality,10)
 ```
 
-There are `r nrow(subset(dataquality, complete_rate < 0.022)) `  features with complete rate near to 0.02. This missingness is probably Missing at Random (MAR), since there is a pattern, being the amount of missing values the same across the features and cases. We choose to drop those features because it's hard to make a good inference on their values based on so scarce data and we were afraid to introduce bias. 
+There are `r nrow(subset(dataquality, complete_rate < 0.022)) `  features with complete rate near to 0.02. This missingness is probably Missing at Random (MAR), since there is a pattern, being the amount of missing values the same across the features and cases. We choose to drop those features because it's hard to make a good inference on their values based on so scarce data. 
 
 ```{r feature selection}
 
@@ -132,7 +132,7 @@ corrplot(cor(training[,-1]),
 
 ```
 
-We tried Principal Component Analysis (PCA) to reduce dimensionality. We kept 90% of the original variance with 20 components, but neither accuracy and interpretability were better than the model without PCA. So, preprocessing was just centering and scaling the variables.
+We have tried Principal Component Analysis (PCA) to reduce dimensionality. We kept 90% of the original variance with 20 components, but neither accuracy and interpretability were better than the model without PCA. So, preprocessing was just centering and scaling the variables.
 
 ```{r preprocessing}
 preProc <- preProcess(training[, -1], method = c("center", "scale"))
@@ -175,11 +175,13 @@ ml_xgboost2 <- readRDS("ml_xgboost2.RDS")
 
 ```
 
-The final parameters were:
+
 
 ```{r}
 ml_xgboost2$finalModel
 ```
+
+The final parameters were:  
 
 * nrounds = 150
 * max_depth = 3
@@ -204,9 +206,10 @@ temp <- subset(dataquality, complete_rate > 0.022)
 testing <- testing[, temp$skim_variable]
 rm(temp)
 
-testing <- predict(preProc, testing) # preprocessing (PCA) testdata using preprocess from training data
+testing <- predict(preProc, testing) # preprocessing testdata using preprocess from training data
 
 cm <- confusionMatrix(predict(ml_xgboost2, newdata = testing[,-1]), reference = as.factor(testing[,1]))
+cm
 cm <- as.data.frame((cm$byClass))
 Avg_precision <- mean(cm$`Pos Pred Value`)
 ```
@@ -218,9 +221,8 @@ The importance of each variable can be assessed in the next table
 varImp(ml_xgboost2)
 ```
 
-precision = 
 
-The acuracy reached 99,73% . The average precision was `r round(Avg_precision,3)`. It can be compared with 
+The acuracy and averaged precision reached 99,7%. This values can be compared with the original paper ones, 98,2% in both measures. This improvement in performance may be credited to the algorithm itself and the carefully tunning of parameters, what was achieved with a reasonably computational cost (circa 5 hours to trainining the model).
 
 ## Prediction and final assessment
 
@@ -245,6 +247,12 @@ temp <- temp[-1,] # drop the target
 testing <- testdata[, temp$skim_variable]
 rm(temp)
 
+# Preprocessing
+
+testing <- predict(preProc, testing)
+
+predicted <- predict(ml_xgboost2, newdata = testing)
+predicted
 ```
 
 
