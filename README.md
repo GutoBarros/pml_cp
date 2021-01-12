@@ -1,3 +1,2 @@
-title: "Practical Machine Learning Course Project"
-author: "Jose Augusto Barros de Oliveira"
-date: "02/01/2021"
+Please refer to https://gutobarros.github.io/pml_cp/
+Thank you!
